@@ -75,11 +75,14 @@ Then use absolute paths in your config:
                   ▼
 ┌──────────────────────────────────────────────────┐
 │  Managed OpenCode backend                         │
-│  opencode --port 4096 --pure                      │
+│  opencode --port 4096                              │
 │  http://127.0.0.1:4096/                           │
 │                                                   │
 │  Spawned on first plugin load. Reused if already  │
 │  reachable. Not tied to the current TUI instance. │
+│  Runs as a full-featured instance with all plugins.│
+│  The wechat plugin inside it detects the managed   │
+│  backend and skips duplicate backend/poller spawn. │
 └──────────────┬───────────────────────────────────┘
                │
                ▼
@@ -97,7 +100,7 @@ Then use absolute paths in your config:
 
 - **Server plugin** (`opencode-wechat-plugin`): registers `wechat_notify` and starts the bridge poller. Backend/bridge startup is fire-and-forget — plugin initialization returns immediately without waiting for the backend to be ready.
 - **TUI plugin** (`opencode-wechat-plugin/tui`): registers `/wechat-bind`, `/wechat-status`, `/wechat-disconnect`.
-- **Managed backend**: `opencode --port 4096 --pure` at `http://127.0.0.1:4096/`. `--pure` prevents external plugin recursion. If the backend is already reachable on that URL, the plugin reuses it instead of spawning a duplicate.
+- **Managed backend**: `opencode --port 4096` at `http://127.0.0.1:4096/`. Runs as a full-featured instance with all user plugins. The wechat plugin detects that it is inside the managed backend (via `OPENCODE_WECHAT_IS_MANAGED_BACKEND=1`) and skips spawning another backend or bridge poller. If the backend is already reachable on that URL, the plugin reuses it instead of spawning a duplicate.
 - **Bridge poller**: long-polls WeChat for new DMs, routes them to the managed backend, pushes replies back. Uses `OPENCODE_BASE_URL` (set automatically by the server plugin).
 - **State files** in `~/.opencode-wechat/`: `token.json`, `target.json`, `sync-buf.json`, `bridge.pid`, `bridge-meta.json`, `bridge.log`, `opencode-backend.pid`, `opencode-backend-meta.json`, `opencode-backend.log`, `sent.log`.
 - **WeChat sessions** are independent of the active TUI session. WeChat-side `/new`, `/sessions`, and `/switch` operate on the managed backend.
@@ -137,7 +140,7 @@ Vendored wechat-acp protocol code is attributed in `NOTICE`.
 | `OPENCODE_WECHAT_STATE_DIR` | `~/.opencode-wechat` | Plugin state directory. |
 | `OPENCODE_WECHAT_BASE_URL` | `https://ilinkai.weixin.qq.com` | WeChat iLink API base URL. |
 | `OPENCODE_WECHAT_INBOUND_PREFIX` | `[WeChat]` | Prefix added to inbound WeChat prompts. |
-| `OPENCODE_WECHAT_OPENCODE_PORT` | `4096` | Managed backend port. Plugin spawns `opencode --port <port> --pure` if the backend is not already reachable. |
+| `OPENCODE_WECHAT_OPENCODE_PORT` | `4096` | Managed backend port. Plugin spawns `opencode --port <port>` if the backend is not already reachable. |
 | `OPENCODE_WECHAT_OPENCODE_URL` | `http://127.0.0.1:4096/` | Managed backend URL. For non-local URLs, the backend must already be reachable — the plugin will not spawn a process. |
 | `OPENCODE_WECHAT_NODE` | auto-detected | Explicit Node.js executable for the bridge child process. |
 | `OPENCODE_WECHAT_DB_PATH` | auto-detected | Explicit OpenCode SQLite DB path for `/sessions` and `/switch`. |

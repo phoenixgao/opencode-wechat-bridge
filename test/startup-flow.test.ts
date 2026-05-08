@@ -35,4 +35,24 @@ describe("non-blocking plugin startup", () => {
     const tool = result.tool ?? {};
     expect(tool.wechat_notify).toBeDefined();
   });
+
+  it("skips bridge startup when OPENCODE_WECHAT_IS_MANAGED_BACKEND is set", async () => {
+    process.env.OPENCODE_WECHAT_IS_MANAGED_BACKEND = "1";
+
+    let called = false;
+    const startBridge = async () => {
+      called = true;
+      return { spawned: true, pid: 42 };
+    };
+
+    const { createWechatPlugin } = await import("../src/index.js");
+
+    const plugin = createWechatPlugin(startBridge);
+
+    const result = await plugin({} as any);
+    expect(result.tool?.wechat_notify).toBeDefined();
+    expect(called).toBe(false);
+
+    delete process.env.OPENCODE_WECHAT_IS_MANAGED_BACKEND;
+  });
 });

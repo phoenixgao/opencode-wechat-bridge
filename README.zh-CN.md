@@ -75,11 +75,12 @@ npm run build
                   ▼
 ┌──────────────────────────────────────────────────┐
 │  托管 OpenCode 后端                                │
-│  opencode --port 4096 --pure                      │
+│  opencode --port 4096                              │
 │  http://127.0.0.1:4096/                           │
 │                                                   │
 │  首次加载插件时自动启动。如果已可达则复用。         │
-│  与当前 TUI 实例无关。                             │
+│  以完整功能实例运行，包含所有用户插件。             │
+│  内部的微信插件检测到托管后端后跳过重复启动。       │
 └──────────────┬───────────────────────────────────┘
                │
                ▼
@@ -97,7 +98,7 @@ npm run build
 
 - **服务端插件**（`opencode-wechat-plugin`）：注册 `wechat_notify` 并启动桥接轮询进程。后端/桥接进程的启动是 fire-and-forget 的 — 插件初始化立即返回，不等待后端就绪。
 - **TUI 插件**（`opencode-wechat-plugin/tui`）：注册 `/wechat-bind`、`/wechat-status`、`/wechat-disconnect`。
-- **托管后端**：`opencode --port 4096 --pure` 运行在 `http://127.0.0.1:4096/`。`--pure` 防止外部插件递归加载。如果后端在该地址已可达，插件会复用而非重复启动。
+- **托管后端**：`opencode --port 4096` 运行在 `http://127.0.0.1:4096/`。以完整功能实例运行，包含所有用户插件。微信插件通过 `OPENCODE_WECHAT_IS_MANAGED_BACKEND=1` 检测到自身在托管后端中运行，跳过重复启动后端和桥接进程。如果后端在该地址已可达，插件会复用而非重复启动。
 - **桥接轮询进程**：长轮询微信新消息，路由到托管后端，回推回复。使用 `OPENCODE_BASE_URL`（由服务端插件自动设置）。
 - **状态文件**位于 `~/.opencode-wechat/`：`token.json`、`target.json`、`sync-buf.json`、`bridge.pid`、`bridge-meta.json`、`bridge.log`、`opencode-backend.pid`、`opencode-backend-meta.json`、`opencode-backend.log`、`sent.log`。
 - **微信会话**与当前 TUI 会话独立。微信端的 `/new`、`/sessions`、`/switch` 操作托管后端。
@@ -137,7 +138,7 @@ vendored wechat-acp 协议代码版权说明见 `NOTICE`。
 | `OPENCODE_WECHAT_STATE_DIR` | `~/.opencode-wechat` | 插件状态目录。 |
 | `OPENCODE_WECHAT_BASE_URL` | `https://ilinkai.weixin.qq.com` | 微信 iLink API 基础地址。 |
 | `OPENCODE_WECHAT_INBOUND_PREFIX` | `[WeChat]` | 微信消息的前缀标记。 |
-| `OPENCODE_WECHAT_OPENCODE_PORT` | `4096` | 托管后端的端口。后端不可达时，插件会启动 `opencode --port <端口> --pure`。 |
+| `OPENCODE_WECHAT_OPENCODE_PORT` | `4096` | 托管后端的端口。后端不可达时，插件会启动 `opencode --port <端口>`。 |
 | `OPENCODE_WECHAT_OPENCODE_URL` | `http://127.0.0.1:4096/` | 托管后端的 URL。对于非本地 URL，后端必须已运行 — 插件不会启动进程。 |
 | `OPENCODE_WECHAT_NODE` | 自动检测 | 桥接子进程使用的 Node.js 可执行文件。 |
 | `OPENCODE_WECHAT_DB_PATH` | 自动检测 | OpenCode SQLite 数据库路径，用于 `/sessions` 和 `/switch`。 |

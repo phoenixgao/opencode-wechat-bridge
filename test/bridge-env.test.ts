@@ -96,7 +96,7 @@ describe("fixed OpenCode backend helpers", () => {
   });
 
 	it("builds minimal OpenCode backend spawn args", () => {
-		expect(buildOpenCodeBackendSpawnArgs("4096")).toEqual(["--port", "4096", "--pure"]);
+		expect(buildOpenCodeBackendSpawnArgs("4096")).toEqual(["--port", "4096"]);
 	});
 
   it("matches backend metadata against the current fixed backend env", () => {

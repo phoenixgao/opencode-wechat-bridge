@@ -70,7 +70,7 @@ export function resolveOpenCodeBackendUrl(env?: OpenCodeBackendEnv): string {
 }
 
 export function buildOpenCodeBackendSpawnArgs(port: string): string[] {
-	return ["--port", port, "--pure"];
+	return ["--port", port];
 }
 
 interface OpenCodeBackendMetadata {
@@ -123,7 +123,7 @@ async function ensureOpenCodeBackendRunning(baseEnv?: NodeJS.ProcessEnv): Promis
 	const child = spawn("opencode", buildOpenCodeBackendSpawnArgs(port), {
 		detached: true,
 		stdio: ["ignore", logFd, logFd],
-		env: { ...baseEnv },
+		env: { ...baseEnv, OPENCODE_WECHAT_IS_MANAGED_BACKEND: "1" },
 	});
 	child.unref();
 
@@ -219,13 +219,15 @@ export function createWechatPlugin(
 	startBridge: (input?: Partial<Pick<PluginInput, "serverUrl" | "directory">>) => Promise<{ spawned: boolean; pid: number }> = ensureBridgeRunning,
 ): Plugin {
 	return async (input) => {
-		void startBridge(input)
-			.then((r) => {
-				if (r.spawned) console.error(`[wechat-plugin] spawned bridge pid=${r.pid}`);
-			})
-			.catch((e) => {
-				console.error(`[wechat-plugin] failed to spawn bridge:`, e);
-			});
+		if (!process.env.OPENCODE_WECHAT_IS_MANAGED_BACKEND) {
+			void startBridge(input)
+				.then((r) => {
+					if (r.spawned) console.error(`[wechat-plugin] spawned bridge pid=${r.pid}`);
+				})
+				.catch((e) => {
+					console.error(`[wechat-plugin] failed to spawn bridge:`, e);
+				});
+		}
 
 		return {
 			tool: {
