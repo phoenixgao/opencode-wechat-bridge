@@ -1,6 +1,6 @@
 {
   "name": "opencode-wechat-bridge",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "OpenCode plugin that bridges Tencent OpenClaw personal WeChat to OpenCode: inbound DMs become prompts, agent replies are pushed to WeChat, and the agent gets a wechat_notify tool.",
   "type": "module",
   "main": "./dist/src/index.js",
