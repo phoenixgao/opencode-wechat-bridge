@@ -1,0 +1,24 @@
+opencode-wechat-plugin
+Copyright (c) 2026 Phoenix
+
+This product vendors source files from third-party open-source projects:
+
+------------------------------------------------------------
+1. wechat-acp (formulahendry/wechat-acp), MIT License
+   https://github.com/formulahendry/wechat-acp
+   Copyright (c) 2025 formulahendry
+
+   Files vendored under src/weixin/:
+     - api.ts       (from src/weixin/api.ts)
+     - auth.ts      (from src/weixin/auth.ts)
+     - monitor.ts   (from src/weixin/monitor.ts)
+     - send.ts      (from src/weixin/send.ts)
+     - types.ts     (from src/weixin/types.ts)
+
+   wechat-acp itself adapts protocol code from:
+     @tencent-weixin/openclaw-weixin (Tencent/openclaw-weixin), MIT License
+     https://github.com/Tencent/openclaw-weixin
+
+------------------------------------------------------------
+
+Full text of the MIT License is included in the LICENSE file.
