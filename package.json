@@ -9,7 +9,7 @@
     "./tui": "./dist/src/tui.js"
   },
   "bin": {
-    "opencode-wechat-bridge": "./dist/src/bridge/cli.js"
+    "opencode-wechat-bridge": "dist/src/bridge/cli.js"
   },
   "files": [
     "dist/src/",
