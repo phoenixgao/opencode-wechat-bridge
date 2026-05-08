@@ -1,7 +1,7 @@
 {
   "name": "opencode-wechat-bridge",
-  "version": "0.2.0",
-  "description": "OpenCode plugin that bridges WeChat (iLink bot) to your OpenCode session: inbound DMs become prompts, agent replies are pushed to WeChat, and the agent gets a wechat_notify tool to proactively notify you.",
+  "version": "0.3.0",
+  "description": "OpenCode plugin that bridges Tencent OpenClaw personal WeChat to OpenCode: inbound DMs become prompts, agent replies are pushed to WeChat, and the agent gets a wechat_notify tool.",
   "type": "module",
   "main": "./dist/src/index.js",
   "exports": {
