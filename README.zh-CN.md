@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-将微信 iLink 机器人桥接到插件管理的 OpenCode 后端。微信收到的消息驱动 OpenCode 会话，助手回复回推微信，同时提供 `wechat_notify` 工具供智能体主动通知。
+将腾讯 OpenClaw 个人微信桥接到插件管理的 OpenCode 后端。微信收到的消息驱动 OpenCode 会话，助手回复回推微信，同时提供 `wechat_notify` 工具供智能体主动通知。
 
 一个 npm 包，两个插件入口：服务端插件注册工具并启动后台桥接进程，TUI 插件注册 `/wechat-bind`、`/wechat-status`、`/wechat-disconnect`。
 
@@ -10,7 +10,13 @@
 
 - Node.js 20+
 - 支持插件的 OpenCode
-- 一个可以生成扫码登录令牌的微信 iLink 机器人/账号
+- 一个可以扫描腾讯 OpenClaw 二维码登录的个人微信号
+
+## 微信协议说明
+
+本桥接复用腾讯官方个人微信 OpenClaw 协议，也就是 `@tencent-weixin/openclaw-weixin` 提供的 `openclaw-weixin` 渠道。扫码登录时可能显示 OpenClaw，因为底层授权流程就是 OpenClaw 的 Weixin 渠道。
+
+腾讯公开文档描述的机制是：扫码登录会创建本地 OpenClaw 账号条目，同一个 OpenClaw 配置中可以让多个微信号同时在线。实际使用时，请把同一个微信号视为只能被一个活跃的 OpenClaw 类桥接占用：如果你用已经绑定过其他 OpenClaw/Lobehub/OpenClaw 实例的微信号来绑定本桥接，之前那个实例可能会失效或被干扰。如果需要两边同时稳定运行，建议使用不同微信号。
 
 ## 快速开始
 
@@ -140,8 +146,13 @@ vendored wechat-acp 协议代码版权说明见 `NOTICE`。
 | `/current` | 显示当前活跃会话。 |
 | `/sessions` | 按目录分组的最近会话。 |
 | `/switch <序号\|ses_xxx>` | 切换活跃会话。 |
-| `/new [标题]` | 创建新会话。 |
+| `/workdir <路径>` | 设置活跃工作目录但不创建会话。会清空当前会话，下一步需要显式 `/new` 或 `/switch`。`~` 会展开为用户主目录。 |
+| `/new [标题]` | 在当前工作目录创建新会话。 |
+| `/new [标题] --dir <路径>` | 在指定路径创建新会话。 |
+| `/new <路径> [标题]` | 在指定路径创建新会话。绝对路径和 `~/...` 会被识别为目录。 |
 | `/last` | 显示最后一次助手输出。 |
+
+默认工作目录是 `~/`。`/switch` 会自动跟随被切换会话保存的目录。
 
 ## 环境变量
 

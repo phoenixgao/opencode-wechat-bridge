@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-Bridge a WeChat iLink bot to a plugin-managed OpenCode backend. Incoming WeChat DMs drive OpenCode sessions, agent replies go back to WeChat, and the agent gets a `wechat_notify` tool for proactive notifications.
+Bridge Tencent OpenClaw personal WeChat to a plugin-managed OpenCode backend. Incoming WeChat DMs drive OpenCode sessions, agent replies go back to WeChat, and the agent gets a `wechat_notify` tool for proactive notifications.
 
 One npm package, two plugin entrypoints: a server plugin that registers the tool and starts the background bridge, and a TUI plugin that adds `/wechat-bind`, `/wechat-status`, and `/wechat-disconnect`.
 
@@ -10,7 +10,13 @@ One npm package, two plugin entrypoints: a server plugin that registers the tool
 
 - Node.js 20+
 - OpenCode with plugin support
-- A WeChat iLink bot/account that can create a QR login token
+- A personal WeChat account that can scan the Tencent OpenClaw QR login
+
+## WeChat Protocol Note
+
+This bridge reuses Tencent's official personal WeChat OpenClaw protocol, exposed as the `openclaw-weixin` channel by `@tencent-weixin/openclaw-weixin`. The QR login may show OpenClaw because the underlying authorization flow is OpenClaw's Weixin channel.
+
+Tencent's public docs describe QR login as creating local OpenClaw account entries and support multiple WeChat accounts in one OpenClaw setup. In practice, the same WeChat account should be treated as owned by one active OpenClaw-style bridge at a time: binding this bridge with an account that was already used by another OpenClaw/Lobehub/OpenClaw setup may disrupt that earlier setup. Use a separate WeChat account if you need both running independently.
 
 ## Quickstart
 
@@ -142,8 +148,13 @@ Vendored wechat-acp protocol code is attributed in `NOTICE`.
 | `/current` | Show active session. |
 | `/sessions` | Recent sessions grouped by directory. |
 | `/switch <num\|ses_xxx>` | Switch active session. |
-| `/new [title]` | Create a new session. |
+| `/workdir <path>` | Set active workdir without creating a session. Clears the current session so the next `/new` or `/switch` is explicit. `~` is expanded. |
+| `/new [title]` | Create a new session in the current workdir. |
+| `/new [title] --dir <path>` | Create a new session in `path`. |
+| `/new <path> [title]` | Create a new session in `path`. Absolute paths and `~/...` are treated as directories. |
 | `/last` | Show last assistant output. |
+
+Default workdir is `~/`. `/switch` follows the selected session's saved directory automatically.
 
 ## Environment variables
 

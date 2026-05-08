@@ -77,8 +77,20 @@ Tell the user the installation is complete. The plugin has these parts:
 
 State is stored in `~/.opencode-wechat/`.
 
+Protocol note:
+- This package uses Tencent's official personal WeChat OpenClaw protocol via the `openclaw-weixin` channel from `@tencent-weixin/openclaw-weixin`.
+- The QR login may show OpenClaw because the underlying authorization flow is OpenClaw's Weixin channel.
+- Treat one WeChat account as belonging to one active OpenClaw-style bridge at a time. If the user previously bound the same account to another OpenClaw/Lobehub/OpenClaw setup, binding this bridge may disrupt that earlier setup.
+
 To use:
 1. Start/open OpenCode
 2. Run `/wechat-bind` and scan the QR code from WeChat
 3. Send a DM to the bot from WeChat — this pins your WeChat user as the reply target
 4. Conversations from WeChat drive the managed OpenCode backend
+
+Useful WeChat-side commands:
+- `/workdir <path>` — set active workdir without creating a session; `~` is expanded
+- `/new [title]` — create a session in the current workdir
+- `/new [title] --dir <path>` — create a session in a specific workdir
+- `/new <path> [title]` — shorthand for creating a session in a specific workdir
+- `/sessions` and `/switch <num|ses_xxx>` — switch to an existing session; the workdir follows the selected session
