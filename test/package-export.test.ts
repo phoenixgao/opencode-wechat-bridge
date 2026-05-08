@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkgPath = path.resolve(here, "..", "package.json");
@@ -21,6 +21,6 @@ describe("package.json exports", () => {
   });
 
   it("preserves opencode-wechat-bridge bin entry", () => {
-    expect(pkg.bin["opencode-wechat-bridge"]).toBe("./dist/src/bridge/cli.js");
+    expect(pkg.bin["opencode-wechat-bridge"]).toBe("dist/src/bridge/cli.js");
   });
 });
