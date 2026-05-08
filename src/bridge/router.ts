@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { TokenData } from "../weixin/auth.js";
 import { sendTextMessage, splitText } from "../weixin/send.js";
@@ -175,10 +177,47 @@ const HELP_TEXT = [
   "  /current          current session id + workdir",
   "  /sessions [N]     recent sessions grouped by directory (default 10, max 30)",
   "  /switch <num|ses_xxx>   switch active session",
+  "  /workdir <path>   set active workdir without creating a session",
   "  /new [title]      create a new session in current workdir",
+  "  /new [title] --dir <path>   create a new session in path",
+  "  /new <path> [title]        create a new session in path",
   "  /last             resend last assistant reply of current session",
   "  (anything else)   forwarded to OpenCode (prefix 'opencode:' is stripped)",
 ].join("\n");
+
+function expandDirectory(input: string, currentDirectory: string): string {
+  if (input === "~") return os.homedir();
+  if (input.startsWith("~/")) return path.join(os.homedir(), input.slice(2));
+  if (path.isAbsolute(input)) return input;
+  return path.resolve(currentDirectory, input);
+}
+
+function looksLikeDirectoryArg(input: string | undefined): input is string {
+  if (!input) return false;
+  return input === "~" || input.startsWith("~/") || path.isAbsolute(input);
+}
+
+function parseNewArgs(args: string[], currentDirectory: string): { directory: string; title: string | undefined; error?: string } {
+  const dirFlagIndex = args.indexOf("--dir");
+  if (dirFlagIndex >= 0) {
+    const dirValue = args[dirFlagIndex + 1];
+    if (!dirValue) return { directory: currentDirectory, title: undefined, error: "/new --dir requires a path" };
+    const title = args
+      .filter((_, index) => index !== dirFlagIndex && index !== dirFlagIndex + 1)
+      .join(" ")
+      .trim() || undefined;
+    return { directory: expandDirectory(dirValue, currentDirectory), title };
+  }
+
+  const [first, ...rest] = args;
+  if (looksLikeDirectoryArg(first)) {
+    const title = rest.join(" ").trim() || undefined;
+    return { directory: expandDirectory(first, currentDirectory), title };
+  }
+
+  const title = args.join(" ").trim() || undefined;
+  return { directory: currentDirectory, title };
+}
 
 export async function handleInboundMessage(
   raw: { from_user_id?: string; message_type?: number; context_token?: string; item_list?: Array<{ type?: number; text_item?: { text?: string } }> },
@@ -279,12 +318,27 @@ export async function handleInboundMessage(
         );
         return;
       }
+      case "/workdir": {
+        const rawDirectory = args[0];
+        if (!rawDirectory) {
+          await sendChunked(token, liveTarget, "❌ /workdir requires a path");
+          return;
+        }
+        cfg.directory = expandDirectory(rawDirectory, cfg.directory);
+        state.currentSessionId = null;
+        await sendChunked(token, liveTarget, `✅ Workdir set to: ${cfg.directory}\n   Current session cleared. Use /new or /switch next.`);
+        return;
+      }
       case "/new": {
-        const title = args.join(" ").trim() || undefined;
+        const parsed = parseNewArgs(args, cfg.directory);
+        if (parsed.error) {
+          await sendChunked(token, liveTarget, `❌ ${parsed.error}`);
+          return;
+        }
         try {
           const r = await client.session.create({
-            query: { directory: cfg.directory },
-            body: title ? { title } : {},
+            query: { directory: parsed.directory },
+            body: parsed.title ? { title: parsed.title } : {},
           });
           const created = unwrap<{ id?: string; directory?: string; title?: string }>(r);
           if (!created?.id) {
@@ -292,12 +346,12 @@ export async function handleInboundMessage(
             return;
           }
           state.currentSessionId = created.id;
-          if (created.directory) cfg.directory = created.directory;
-          log.info("created new session", { sessionId: created.id, directory: cfg.directory, title });
+          cfg.directory = created.directory || parsed.directory;
+          log.info("created new session", { sessionId: created.id, directory: cfg.directory, title: parsed.title });
           await sendChunked(
             token,
             liveTarget,
-            `✅ New session: ${created.id}\n   ${created.title || title || "(untitled)"}\n   Workdir: ${cfg.directory}`,
+            `✅ New session: ${created.id}\n   ${created.title || parsed.title || "(untitled)"}\n   Workdir: ${cfg.directory}`,
           );
         } catch (err) {
           const msg = (err as Error).message;
