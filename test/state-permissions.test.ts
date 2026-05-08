@@ -88,4 +88,17 @@ describe("state permissions", () => {
     expect((fs.statSync(path.join(dir, "nested")).mode & 0o777)).toBe(0o700);
     expect((fs.statSync(path.join(dir, "nested", "bridge.log")).mode & 0o777)).toBe(0o600);
   });
+
+  it("resolves separate state paths for the managed OpenCode backend", async () => {
+    const dir = tempStateDir();
+    process.env.OPENCODE_WECHAT_STATE_DIR = dir;
+
+    const { opencodeBackendLogPath, opencodeBackendMetaPath, opencodeBackendPidPath } = await import(
+      "../src/state/paths.js"
+    );
+
+    expect(opencodeBackendPidPath()).toBe(path.join(dir, "opencode-backend.pid"));
+    expect(opencodeBackendMetaPath()).toBe(path.join(dir, "opencode-backend-meta.json"));
+    expect(opencodeBackendLogPath()).toBe(path.join(dir, "opencode-backend.log"));
+  });
 });

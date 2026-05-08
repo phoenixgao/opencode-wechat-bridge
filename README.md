@@ -1,6 +1,8 @@
 # opencode-wechat-plugin
 
-OpenCode plugin that bridges a WeChat iLink bot to your active OpenCode server. Incoming WeChat DMs can drive OpenCode sessions, agent replies are sent back to the pinned WeChat user, and agents get a `wechat_notify` tool for proactive notifications.
+Bridge a WeChat iLink bot to a plugin-managed OpenCode backend. Incoming WeChat DMs drive OpenCode sessions, agent replies go back to WeChat, and the agent gets a `wechat_notify` tool for proactive notifications.
+
+One npm package, two plugin entrypoints: a server plugin that registers the tool and starts the background bridge, and a TUI plugin that adds `/wechat-bind`, `/wechat-status`, and `/wechat-disconnect`.
 
 ## Requirements
 
@@ -8,11 +10,40 @@ OpenCode plugin that bridges a WeChat iLink bot to your active OpenCode server. 
 - OpenCode with plugin support
 - A WeChat iLink bot/account that can create a QR login token
 
-## Install and configure
+## Quickstart
 
-Install from GitHub or from npm after the package is published, then configure two separate OpenCode plugin surfaces.
+### 1. Install
 
-### Install from GitHub source
+```sh
+npm install -g opencode-wechat-plugin
+```
+
+### 2. Configure OpenCode plugins
+
+Add to `opencode.json` (server plugin — registers the `wechat_notify` tool and starts the bridge):
+
+```json
+{
+  "plugin": ["opencode-wechat-plugin"]
+}
+```
+
+Add to `tui.json` (TUI plugin — registers slash commands):
+
+```json
+{
+  "plugin": ["opencode-wechat-plugin/tui"]
+}
+```
+
+### 3. Bind and start
+
+1. Start OpenCode.
+2. In the TUI, run `/wechat-bind` and scan the QR code from WeChat.
+3. Send one DM to the bot from WeChat. That pins your WeChat user as the reply target.
+4. Continue the conversation from WeChat, or ask the agent to use `wechat_notify`.
+
+### From source (development)
 
 ```sh
 git clone git@github.com:phoenixgao/opencode-wechat-bridge.git
@@ -21,133 +52,105 @@ npm install
 npm run build
 ```
 
-Use the absolute `dist` paths in the config examples below when installing from source.
+Then use absolute paths in your config:
 
-### Install from npm package
-
-After this package is published to npm:
-
-```sh
-npm install -g opencode-wechat-plugin
-```
-
-Then use the package-name config examples below.
-
-### Server plugin (`opencode.json`)
-
-The server plugin registers the `wechat_notify` tool and starts the background bridge poller.
-
-Package install:
-
-```json
-{
-  "plugin": ["opencode-wechat-plugin"]
-}
-```
-
-GitHub/source build:
-
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/index.js"]
-}
-```
-
-### TUI plugin (`tui.json`)
-
-The TUI plugin registers `/wechat-bind`, `/wechat-status`, and `/wechat-disconnect`.
-
-OpenCode TUI plugins live in `tui.json`, not `opencode.json`.
-
-Package install:
-
-```json
-{
-  "plugin": ["opencode-wechat-plugin/tui"]
-}
-```
-
-GitHub/source build:
-
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/tui.js"]
-}
-```
-
-## Usage
-
-In the OpenCode TUI:
-
-- `/wechat-bind` — QR-bind the WeChat iLink bot and store the local token.
-- `/wechat-status` — show local state without leaking token or session context.
-- `/wechat-disconnect` — remove token, pinned target, and sync buffer while preserving logs.
-
-After binding, DM the bot once from WeChat. That pins your WeChat user as the target for outbound replies and `wechat_notify`.
-
-Agent tool:
-
-- `wechat_notify` — send a message to the pinned WeChat target, useful when you ask the agent to notify you when work is done.
-
-WeChat-side commands:
-
-- `/help` — command list.
-- `/status` — current bridge/session status.
-- `/current` — show active session.
-- `/sessions` — recent sessions grouped by directory.
-- `/switch <num|ses_xxx>` — switch active session.
-- `/new [title]` — create a new session.
-- `/last` — show last assistant output.
-
-Normal TUI usage does not require running the CLI directly. The CLI is optional debugging support.
-
-Typical first run:
-
-1. Start OpenCode after configuring both plugin surfaces.
-2. Run `/wechat-bind` in the OpenCode TUI.
-3. Scan the QR code from WeChat.
-4. Send one DM to the bot from WeChat so the bridge can pin your WeChat user as the reply target.
-5. Continue the conversation from WeChat, or ask the agent to use `wechat_notify`.
+- `opencode.json`: `"plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/index.js"]`
+- `tui.json`: `"plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/tui.js"]`
 
 ## Architecture
 
-- **Server plugin** (`opencode-wechat-plugin`) registers `wechat_notify` and starts a detached bridge poller.
-- **TUI plugin** (`opencode-wechat-plugin/tui`) registers `/wechat-bind`, `/wechat-status`, and `/wechat-disconnect`.
-- **Detached bridge poller** (`dist/src/bridge/cli.js poll`) long-polls WeChat updates and routes messages into OpenCode using the SDK/API.
-- **State files** live under `OPENCODE_WECHAT_STATE_DIR` or `~/.opencode-wechat`: token, pinned target, sync buffer, bridge pid/log, and send log.
-- **OpenCode SDK/API use** goes through the OpenCode HTTP server URL supplied by `PluginInput.serverUrl` when started as a server plugin.
-- **Read-only SQLite discovery** is used only as a best-effort way to support cross-workdir `/sessions` and `/switch`; the plugin opens the OpenCode DB read-only.
+```
+┌──────────────────────────────────────────────────┐
+│  OpenCode TUI (your session)                      │
+│  ┌──────────────────────────────────────────────┐ │
+│  │  TUI plugin  (/wechat-bind/status/disconnect)│ │
+│  └──────────────────────────────────────────────┘ │
+│  ┌──────────────────────────────────────────────┐ │
+│  │  Server plugin (wechat_notify tool + bridge)  │ │
+│  └──────────────┬───────────────────────────────┘ │
+└─────────────────┼──────────────────────────────────┘
+                  │ starts (fire-and-forget)
+                  ▼
+┌──────────────────────────────────────────────────┐
+│  Managed OpenCode backend                         │
+│  opencode --port 4096 --pure                      │
+│  http://127.0.0.1:4096/                           │
+│                                                   │
+│  Spawned on first plugin load. Reused if already  │
+│  reachable. Not tied to the current TUI instance. │
+└──────────────┬───────────────────────────────────┘
+               │
+               ▼
+┌──────────────────────────────────────────────────┐
+│  Detached bridge poller                           │
+│  node dist/src/bridge/cli.js poll                 │
+│                                                   │
+│  Long-polls WeChat. Routes DMs → OpenCode backend.│
+│  Pushes assistant replies → WeChat.               │
+└──────────────┬───────────────────────────────────┘
+               │
+               ▼
+          WeChat iLink API
+```
+
+- **Server plugin** (`opencode-wechat-plugin`): registers `wechat_notify` and starts the bridge poller. Backend/bridge startup is fire-and-forget — plugin initialization returns immediately without waiting for the backend to be ready.
+- **TUI plugin** (`opencode-wechat-plugin/tui`): registers `/wechat-bind`, `/wechat-status`, `/wechat-disconnect`.
+- **Managed backend**: `opencode --port 4096 --pure` at `http://127.0.0.1:4096/`. `--pure` prevents external plugin recursion. If the backend is already reachable on that URL, the plugin reuses it instead of spawning a duplicate.
+- **Bridge poller**: long-polls WeChat for new DMs, routes them to the managed backend, pushes replies back. Uses `OPENCODE_BASE_URL` (set automatically by the server plugin).
+- **State files** in `~/.opencode-wechat/`: `token.json`, `target.json`, `sync-buf.json`, `bridge.pid`, `bridge-meta.json`, `bridge.log`, `opencode-backend.pid`, `opencode-backend-meta.json`, `opencode-backend.log`, `sent.log`.
+- **WeChat sessions** are independent of the active TUI session. WeChat-side `/new`, `/sessions`, and `/switch` operate on the managed backend.
 
 Vendored wechat-acp protocol code is attributed in `NOTICE`.
 
+## Usage
+
+### TUI slash commands
+
+| Command | Description |
+|---|---|
+| `/wechat-bind` | QR-bind the WeChat iLink bot and store the local token. |
+| `/wechat-status` | Show bind state without leaking token or session context. |
+| `/wechat-disconnect` | Remove token, target, and sync buffer. Logs are preserved. |
+
+### Agent tool
+
+`wechat_notify` — sends a message to the pinned WeChat user. The agent uses this to notify you when work completes (e.g. "处理完了用微信通知我").
+
+### WeChat-side commands
+
+| Command | Description |
+|---|---|
+| `/help` | Show command list. |
+| `/status` | Current bridge and session status. |
+| `/current` | Show active session. |
+| `/sessions` | Recent sessions grouped by directory. |
+| `/switch <num\|ses_xxx>` | Switch active session. |
+| `/new [title]` | Create a new session. |
+| `/last` | Show last assistant output. |
+
 ## Environment variables
 
-- `OPENCODE_WECHAT_STATE_DIR` — override local plugin state directory.
-- `OPENCODE_WECHAT_BASE_URL` — WeChat iLink API base URL used by bind/TUI code.
-- `OPENCODE_WECHAT_INBOUND_PREFIX` — prefix added to inbound WeChat prompts (default `[WeChat]`).
-- `OPENCODE_BASE_URL` — OpenCode HTTP server URL for the bridge poller. The server plugin sets this from `PluginInput.serverUrl`.
-- `OPENCODE_DIRECTORY` — OpenCode working directory for the bridge poller. The server plugin sets this from `PluginInput.directory`.
-- `OPENCODE_WECHAT_DB_PATH` — explicit OpenCode SQLite DB path for read-only cross-workdir session discovery.
-- `OPENCODE_DB` — OpenCode DB setting honored when `OPENCODE_WECHAT_DB_PATH` is not set. Absolute paths and `:memory:` are used directly; relative paths resolve under the OpenCode data dir.
-- `XDG_DATA_HOME` — base data directory for default OpenCode DB discovery (`$XDG_DATA_HOME/opencode/opencode.db`). If unset, discovery falls back to `~/.local/share/opencode/opencode.db`.
+| Variable | Default | Description |
+|---|---|---|
+| `OPENCODE_WECHAT_STATE_DIR` | `~/.opencode-wechat` | Plugin state directory. |
+| `OPENCODE_WECHAT_BASE_URL` | `https://ilinkai.weixin.qq.com` | WeChat iLink API base URL. |
+| `OPENCODE_WECHAT_INBOUND_PREFIX` | `[WeChat]` | Prefix added to inbound WeChat prompts. |
+| `OPENCODE_WECHAT_OPENCODE_PORT` | `4096` | Managed backend port. Plugin spawns `opencode --port <port> --pure` if the backend is not already reachable. |
+| `OPENCODE_WECHAT_OPENCODE_URL` | `http://127.0.0.1:4096/` | Managed backend URL. For non-local URLs, the backend must already be reachable — the plugin will not spawn a process. |
+| `OPENCODE_WECHAT_NODE` | auto-detected | Explicit Node.js executable for the bridge child process. |
+| `OPENCODE_WECHAT_DB_PATH` | auto-detected | Explicit OpenCode SQLite DB path for `/sessions` and `/switch`. |
+| `OPENCODE_BASE_URL` | set by plugin | OpenCode backend URL for the bridge. Set automatically; do not override for normal use. |
+| `OPENCODE_DIRECTORY` | set by plugin | Working directory for the bridge. Set from `PluginInput.directory`. |
+| `OPENCODE_DB` | auto-detected | OpenCode DB setting. Used when `OPENCODE_WECHAT_DB_PATH` is not set. |
+| `XDG_DATA_HOME` | `~/.local/share` | Base data directory for default OpenCode DB discovery. |
 
-## FAQ
+## Security
 
-### What is `127.0.0.1:4096`?
-
-It is the OpenCode HTTP server manual fallback used only when the bridge poller is run outside the server plugin and no `OPENCODE_BASE_URL` or explicit option is provided. It is not a WeChat endpoint.
-
-### Why does the plugin read an OpenCode DB path?
-
-OpenCode plugin input exposes `serverUrl` and `directory`, but it does not expose the DB path. The plugin reads the DB path best-effort so WeChat-side `/sessions` and `/switch` can discover sessions across workdirs. SQLite access is read-only and not required for basic message routing.
-
-## Security and state notes
-
-- Tokens, pinned targets, sync buffers, and bridge/send logs are stored locally in the plugin state directory. Treat that directory and its files as sensitive.
-- The plugin attempts to create the state directory with private permissions and writes local state/log files with private permissions where the platform allows.
-- `/wechat-status` avoids token, context-token, and prompt/session-content leaks.
-- `/wechat-disconnect` removes token, target, and sync state, but preserves logs for local troubleshooting.
-- Do not commit state files, logs, tokens, or local config containing private paths/secrets.
+- Tokens, targets, sync buffers, and logs are stored locally in the state directory. Treat that directory as sensitive.
+- The plugin creates the state directory with private permissions (`0o700`) and state files with `0o600` where the platform supports it.
+- `/wechat-status` never leaks token, context-token, or prompt/session content.
+- `/wechat-disconnect` removes token, target, and sync state but keeps logs for local troubleshooting.
+- Do not commit state files, logs, or config with private paths or secrets.
 
 ## Development
 
@@ -158,18 +161,18 @@ npm run typecheck
 npm run build
 ```
 
-This repo uses npm scripts and currently includes `package-lock.json`, so npm is the default package manager for development and publishing. Bun is fine for local experiments if you prefer it, but publish with npm (`npm publish`) after running the package verification flow.
-
-Before publishing to npm, verify the package contents without uploading:
+Before publishing:
 
 ```sh
-npm pack --dry-run
+npm pack --dry-run     # verify package contents
+npm publish --dry-run  # preview publish
+npm publish            # publish to npm
 ```
 
-Optional CLI debugging after build:
+The CLI is optional for debugging after build:
 
 ```sh
 node dist/src/bridge/cli.js status
 ```
 
-Do not run bind/send/poll commands unless you intentionally want a real WeChat network flow. The CLI is not required for normal TUI usage.
+Do not run bind/send/poll commands unless you want a real WeChat network flow. The CLI is not required for normal TUI usage.

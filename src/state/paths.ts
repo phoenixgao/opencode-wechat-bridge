@@ -79,6 +79,18 @@ export function bridgeLogPath(): string {
   return path.join(stateDir(), "bridge.log");
 }
 
+export function opencodeBackendPidPath(): string {
+  return path.join(stateDir(), "opencode-backend.pid");
+}
+
+export function opencodeBackendMetaPath(): string {
+  return path.join(stateDir(), "opencode-backend-meta.json");
+}
+
+export function opencodeBackendLogPath(): string {
+  return path.join(stateDir(), "opencode-backend.log");
+}
+
 export function sentLogPath(): string {
   return path.join(stateDir(), "sent.log");
 }
