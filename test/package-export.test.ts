@@ -20,7 +20,7 @@ describe("package.json exports", () => {
     expect(pkg.exports["./tui"]).toBe("./dist/src/tui.js");
   });
 
-  it("preserves opencode-wechat bin entry", () => {
-    expect(pkg.bin["opencode-wechat"]).toBe("./dist/src/bridge/cli.js");
+  it("preserves opencode-wechat-bridge bin entry", () => {
+    expect(pkg.bin["opencode-wechat-bridge"]).toBe("./dist/src/bridge/cli.js");
   });
 });

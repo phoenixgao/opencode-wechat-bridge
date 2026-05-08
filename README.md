@@ -1,4 +1,4 @@
-# opencode-wechat-plugin
+# opencode-wechat-bridge
 
 English | [简体中文](README.zh-CN.md)
 
@@ -14,31 +14,43 @@ One npm package, two plugin entrypoints: a server plugin that registers the tool
 
 ## Quickstart
 
-### 1. Install
+### For Humans
+
+Paste this prompt to your LLM agent (Claude Code, OpenCode, Cursor, etc.):
+
+```
+Install and configure opencode-wechat-bridge by following the instructions here:
+https://raw.githubusercontent.com/phoenixgao/opencode-wechat-bridge/refs/heads/main/docs/installation.md
+```
+
+That's it. The agent handles everything.
+
+### Manual installation
+
+<details>
+<summary>Click if you prefer running commands yourself</summary>
 
 ```sh
-npm install -g opencode-wechat-plugin
+npm install -g opencode-wechat-bridge
 ```
 
-### 2. Configure OpenCode plugins
-
-Add to `opencode.json` (server plugin — registers the `wechat_notify` tool and starts the bridge):
+Add to `opencode.json`:
 
 ```json
-{
-  "plugin": ["opencode-wechat-plugin"]
-}
+{ "plugin": ["opencode-wechat-bridge"] }
 ```
 
-Add to `tui.json` (TUI plugin — registers slash commands):
+Add to `tui.json`:
 
 ```json
-{
-  "plugin": ["opencode-wechat-plugin/tui"]
-}
+{ "plugin": ["opencode-wechat-bridge/tui"] }
 ```
 
-### 3. Bind and start
+Start OpenCode, run `/wechat-bind`, scan the QR code from WeChat, then send a DM to the bot.
+
+</details>
+
+### First run
 
 1. Start OpenCode.
 2. In the TUI, run `/wechat-bind` and scan the QR code from WeChat.
@@ -56,8 +68,8 @@ npm run build
 
 Then use absolute paths in your config:
 
-- `opencode.json`: `"plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/index.js"]`
-- `tui.json`: `"plugin": ["/absolute/path/to/opencode-wechat-plugin/dist/src/tui.js"]`
+- `opencode.json`: `"plugin": ["/absolute/path/to/opencode-wechat-bridge/dist/src/index.js"]`
+- `tui.json`: `"plugin": ["/absolute/path/to/opencode-wechat-bridge/dist/src/tui.js"]`
 
 ## Architecture
 
@@ -98,8 +110,8 @@ Then use absolute paths in your config:
           WeChat iLink API
 ```
 
-- **Server plugin** (`opencode-wechat-plugin`): registers `wechat_notify` and starts the bridge poller. Backend/bridge startup is fire-and-forget — plugin initialization returns immediately without waiting for the backend to be ready.
-- **TUI plugin** (`opencode-wechat-plugin/tui`): registers `/wechat-bind`, `/wechat-status`, `/wechat-disconnect`.
+- **Server plugin** (`opencode-wechat-bridge`): registers `wechat_notify` and starts the bridge poller. Backend/bridge startup is fire-and-forget — plugin initialization returns immediately without waiting for the backend to be ready.
+- **TUI plugin** (`opencode-wechat-bridge/tui`): registers `/wechat-bind`, `/wechat-status`, `/wechat-disconnect`.
 - **Managed backend**: `opencode --port 4096` at `http://127.0.0.1:4096/`. Runs as a full-featured instance with all user plugins. The wechat plugin detects that it is inside the managed backend (via `OPENCODE_WECHAT_IS_MANAGED_BACKEND=1`) and skips spawning another backend or bridge poller. If the backend is already reachable on that URL, the plugin reuses it instead of spawning a duplicate.
 - **Bridge poller**: long-polls WeChat for new DMs, routes them to the managed backend, pushes replies back. Uses `OPENCODE_BASE_URL` (set automatically by the server plugin).
 - **State files** in `~/.opencode-wechat/`: `token.json`, `target.json`, `sync-buf.json`, `bridge.pid`, `bridge-meta.json`, `bridge.log`, `opencode-backend.pid`, `opencode-backend-meta.json`, `opencode-backend.log`, `sent.log`.

@@ -37,8 +37,8 @@ describe("release hardening source assertions", () => {
     const readme = readRel("README.md");
 
     for (const phrase of [
-      "opencode-wechat-plugin",
-      "opencode-wechat-plugin/tui",
+      "opencode-wechat-bridge",
+      "opencode-wechat-bridge/tui",
       "opencode.json",
       "tui.json",
       "/wechat-bind",

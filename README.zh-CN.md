@@ -1,4 +1,4 @@
-# opencode-wechat-plugin
+# opencode-wechat-bridge
 
 [English](README.md) | 简体中文
 
@@ -14,31 +14,43 @@
 
 ## 快速开始
 
-### 1. 安装
+### 给人类用
+
+把下面这段发给你的 LLM 智能体（Claude Code、OpenCode、Cursor 等）：
+
+```
+Install and configure opencode-wechat-bridge by following the instructions here:
+https://raw.githubusercontent.com/phoenixgao/opencode-wechat-bridge/refs/heads/main/docs/installation.md
+```
+
+搞定。智能体会处理剩下的事。
+
+### 手动安装
+
+<details>
+<summary>点击展开：如果你喜欢自己敲命令</summary>
 
 ```sh
-npm install -g opencode-wechat-plugin
+npm install -g opencode-wechat-bridge
 ```
 
-### 2. 配置 OpenCode 插件
-
-在 `opencode.json` 中添加（服务端插件 — 注册 `wechat_notify` 工具并启动桥接进程）：
+在 `opencode.json` 中添加：
 
 ```json
-{
-  "plugin": ["opencode-wechat-plugin"]
-}
+{ "plugin": ["opencode-wechat-bridge"] }
 ```
 
-在 `tui.json` 中添加（TUI 插件 — 注册斜杠命令）：
+在 `tui.json` 中添加：
 
 ```json
-{
-  "plugin": ["opencode-wechat-plugin/tui"]
-}
+{ "plugin": ["opencode-wechat-bridge/tui"] }
 ```
 
-### 3. 绑定并开始使用
+启动 OpenCode，运行 `/wechat-bind`，从微信扫描二维码，然后给机器人发一条消息。
+
+</details>
+
+### 首次使用
 
 1. 启动 OpenCode。
 2. 在 TUI 中运行 `/wechat-bind`，从微信扫描二维码。
@@ -56,8 +68,8 @@ npm run build
 
 然后在配置中使用绝对路径：
 
-- `opencode.json`：`"plugin": ["/绝对路径/opencode-wechat-plugin/dist/src/index.js"]`
-- `tui.json`：`"plugin": ["/绝对路径/opencode-wechat-plugin/dist/src/tui.js"]`
+- `opencode.json`：`"plugin": ["/绝对路径/opencode-wechat-bridge/dist/src/index.js"]`
+- `tui.json`：`"plugin": ["/绝对路径/opencode-wechat-bridge/dist/src/tui.js"]`
 
 ## 架构
 
@@ -96,8 +108,8 @@ npm run build
           微信 iLink API
 ```
 
-- **服务端插件**（`opencode-wechat-plugin`）：注册 `wechat_notify` 并启动桥接轮询进程。后端/桥接进程的启动是 fire-and-forget 的 — 插件初始化立即返回，不等待后端就绪。
-- **TUI 插件**（`opencode-wechat-plugin/tui`）：注册 `/wechat-bind`、`/wechat-status`、`/wechat-disconnect`。
+- **服务端插件**（`opencode-wechat-bridge`）：注册 `wechat_notify` 并启动桥接轮询进程。后端/桥接进程的启动是 fire-and-forget 的 — 插件初始化立即返回，不等待后端就绪。
+- **TUI 插件**（`opencode-wechat-bridge/tui`）：注册 `/wechat-bind`、`/wechat-status`、`/wechat-disconnect`。
 - **托管后端**：`opencode --port 4096` 运行在 `http://127.0.0.1:4096/`。以完整功能实例运行，包含所有用户插件。微信插件通过 `OPENCODE_WECHAT_IS_MANAGED_BACKEND=1` 检测到自身在托管后端中运行，跳过重复启动后端和桥接进程。如果后端在该地址已可达，插件会复用而非重复启动。
 - **桥接轮询进程**：长轮询微信新消息，路由到托管后端，回推回复。使用 `OPENCODE_BASE_URL`（由服务端插件自动设置）。
 - **状态文件**位于 `~/.opencode-wechat/`：`token.json`、`target.json`、`sync-buf.json`、`bridge.pid`、`bridge-meta.json`、`bridge.log`、`opencode-backend.pid`、`opencode-backend-meta.json`、`opencode-backend.log`、`sent.log`。
