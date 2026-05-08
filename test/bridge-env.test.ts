@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBridgeEnv, resolveBridgeNodeExecutable } from "../src/index.js";
+import { bridgeMetadataMatchesEnv, buildBridgeEnv, resolveBridgeNodeExecutable } from "../src/index.js";
 
 describe("buildBridgeEnv", () => {
   it("passes PluginInput serverUrl and directory to the detached poller env", () => {
@@ -84,5 +84,25 @@ describe("resolveBridgeNodeExecutable", () => {
 
   it("falls back to node when execPath is opencode", () => {
     expect(resolveBridgeNodeExecutable("/usr/local/bin/opencode", { OPENCODE_WECHAT_NODE: undefined })).toBe("node");
+  });
+});
+
+describe("bridgeMetadataMatchesEnv", () => {
+  it("rejects an alive bridge launched with a stale OpenCode base URL", () => {
+    expect(
+      bridgeMetadataMatchesEnv(
+        { baseUrl: "http://localhost:4096/", directory: "/repo" },
+        { OPENCODE_BASE_URL: "http://127.0.0.1:57985/", OPENCODE_DIRECTORY: "/repo" },
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts an alive bridge launched with the current OpenCode base URL", () => {
+    expect(
+      bridgeMetadataMatchesEnv(
+        { baseUrl: "http://127.0.0.1:57985/", directory: "/repo" },
+        { OPENCODE_BASE_URL: "http://127.0.0.1:57985/", OPENCODE_DIRECTORY: "/repo" },
+      ),
+    ).toBe(true);
   });
 });

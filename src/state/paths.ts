@@ -71,6 +71,10 @@ export function bridgePidPath(): string {
   return path.join(stateDir(), "bridge.pid");
 }
 
+export function bridgeMetaPath(): string {
+  return path.join(stateDir(), "bridge-meta.json");
+}
+
 export function bridgeLogPath(): string {
   return path.join(stateDir(), "bridge.log");
 }

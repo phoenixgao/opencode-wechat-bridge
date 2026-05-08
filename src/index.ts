@@ -4,7 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
 import { loadTarget } from "./bridge/target.js";
-import { bridgeLogPath, bridgePidPath, ensureStateDir, openPrivateAppendFile, writePrivateFile } from "./state/paths.js";
+import {
+	bridgeLogPath,
+	bridgeMetaPath,
+	bridgePidPath,
+	ensureStateDir,
+	openPrivateAppendFile,
+	writePrivateFile,
+} from "./state/paths.js";
 import { loadToken } from "./weixin/auth.js";
 import { sendTextMessage, splitText } from "./weixin/send.js";
 
@@ -30,6 +37,14 @@ function isAlive(pid: number): boolean {
 	}
 }
 
+function stopBridge(pid: number): void {
+	try {
+		process.kill(pid, "SIGTERM");
+	} catch {
+		// stale pid or insufficient permission; spawning a fresh bridge is still safe
+	}
+}
+
 export function buildBridgeEnv(
 	baseEnv?: NodeJS.ProcessEnv,
 	input?: Partial<Pick<PluginInput, "serverUrl" | "directory">>,
@@ -40,26 +55,67 @@ export function buildBridgeEnv(
 	return env;
 }
 
+interface BridgeMetadata {
+	baseUrl?: string;
+	directory?: string;
+}
+
+function readBridgeMetadata(): BridgeMetadata | null {
+	try {
+		const raw = readFileSync(bridgeMetaPath(), "utf8");
+		const parsed = JSON.parse(raw) as BridgeMetadata;
+		return parsed && typeof parsed === "object" ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+export function bridgeMetadataMatchesEnv(
+	metadata: BridgeMetadata | null,
+	env: { OPENCODE_BASE_URL?: string; OPENCODE_DIRECTORY?: string },
+): boolean {
+	if (!metadata) return false;
+	return (
+		metadata.baseUrl === env.OPENCODE_BASE_URL &&
+		metadata.directory === env.OPENCODE_DIRECTORY
+	);
+}
+
 function ensureBridgeRunning(
 	input?: Partial<Pick<PluginInput, "serverUrl" | "directory">>,
 ): { spawned: boolean; pid: number } {
 	ensureStateDir();
+	const env = buildBridgeEnv(process.env, input);
 	const pidFile = bridgePidPath();
   if (existsSync(pidFile)) {
     const existing = Number.parseInt(readFileSync(pidFile, "utf8").trim(), 10);
 		if (Number.isFinite(existing) && isAlive(existing)) {
-			return { spawned: false, pid: existing };
+			if (bridgeMetadataMatchesEnv(readBridgeMetadata(), env)) {
+				return { spawned: false, pid: existing };
+			}
+			stopBridge(existing);
 		}
 	}
 	const logFd = openPrivateAppendFile(bridgeLogPath());
 	const child = spawn(resolveBridgeNodeExecutable(process.execPath, process.env), [cliPath, "poll"], {
 		detached: true,
 		stdio: ["ignore", logFd, logFd],
-		env: buildBridgeEnv(process.env, input),
+		env,
 	});
 	child.unref();
 	const pid = child.pid ?? 0;
 	writePrivateFile(pidFile, String(pid));
+	writePrivateFile(
+		bridgeMetaPath(),
+		JSON.stringify(
+			{
+				baseUrl: env.OPENCODE_BASE_URL,
+				directory: env.OPENCODE_DIRECTORY,
+			},
+			null,
+			2,
+		),
+	);
 	return { spawned: true, pid };
 }
 
