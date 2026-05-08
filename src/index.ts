@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
@@ -153,6 +153,13 @@ export function buildBridgeEnv(
 interface BridgeMetadata {
 	baseUrl?: string;
 	directory?: string;
+	runtimeId?: string;
+}
+
+export function bridgeRuntimeId(runtimeCliPath = cliPath): string {
+	const resolvedCliPath = path.resolve(runtimeCliPath);
+	const stat = statSync(resolvedCliPath);
+	return `${resolvedCliPath}:${stat.mtimeMs}:${stat.size}`;
 }
 
 function readBridgeMetadata(): BridgeMetadata | null {
@@ -167,12 +174,17 @@ function readBridgeMetadata(): BridgeMetadata | null {
 
 export function bridgeMetadataMatchesEnv(
 	metadata: BridgeMetadata | null,
-	env: { OPENCODE_BASE_URL?: string; OPENCODE_DIRECTORY?: string },
+	env: {
+		OPENCODE_BASE_URL?: string;
+		OPENCODE_DIRECTORY?: string;
+		OPENCODE_WECHAT_BRIDGE_RUNTIME_ID?: string;
+	},
 ): boolean {
 	if (!metadata) return false;
 	return (
 		metadata.baseUrl === env.OPENCODE_BASE_URL &&
-		metadata.directory === env.OPENCODE_DIRECTORY
+		metadata.directory === env.OPENCODE_DIRECTORY &&
+		metadata.runtimeId === env.OPENCODE_WECHAT_BRIDGE_RUNTIME_ID
 	);
 }
 
@@ -182,6 +194,7 @@ async function ensureBridgeRunning(
 	ensureStateDir();
 	const backendUrl = await ensureOpenCodeBackendRunning(process.env);
 	const env = buildBridgeEnv(process.env, input, backendUrl);
+	env.OPENCODE_WECHAT_BRIDGE_RUNTIME_ID = bridgeRuntimeId();
 	const pidFile = bridgePidPath();
 	if (existsSync(pidFile)) {
 		const existing = readPidIfPresent(pidFile);
@@ -207,6 +220,7 @@ async function ensureBridgeRunning(
 			{
 				baseUrl: env.OPENCODE_BASE_URL,
 				directory: env.OPENCODE_DIRECTORY,
+				runtimeId: env.OPENCODE_WECHAT_BRIDGE_RUNTIME_ID,
 			},
 			null,
 			2,

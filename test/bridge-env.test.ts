@@ -144,21 +144,53 @@ describe("resolveBridgeNodeExecutable", () => {
 });
 
 describe("bridgeMetadataMatchesEnv", () => {
-  it("rejects an alive bridge launched with a stale OpenCode base URL", () => {
-    expect(
-      bridgeMetadataMatchesEnv(
-        { baseUrl: "http://localhost:4096/", directory: "/repo" },
-        { OPENCODE_BASE_URL: "http://127.0.0.1:57985/", OPENCODE_DIRECTORY: "/repo" },
-      ),
-    ).toBe(false);
-  });
+	it("rejects an alive bridge launched with a stale OpenCode base URL", () => {
+		expect(
+			bridgeMetadataMatchesEnv(
+				{ baseUrl: "http://localhost:4096/", directory: "/repo" },
+				{
+					OPENCODE_BASE_URL: "http://127.0.0.1:57985/",
+					OPENCODE_DIRECTORY: "/repo",
+					OPENCODE_WECHAT_BRIDGE_RUNTIME_ID: "runtime-1",
+				},
+			),
+		).toBe(false);
+	});
 
-  it("accepts an alive bridge launched with the current OpenCode base URL", () => {
-    expect(
-      bridgeMetadataMatchesEnv(
-        { baseUrl: "http://127.0.0.1:57985/", directory: "/repo" },
-        { OPENCODE_BASE_URL: "http://127.0.0.1:57985/", OPENCODE_DIRECTORY: "/repo" },
-      ),
-    ).toBe(true);
-  });
+	it("rejects alive bridge metadata that lacks the current runtime fingerprint", () => {
+		expect(
+			bridgeMetadataMatchesEnv(
+				{ baseUrl: "http://127.0.0.1:57985/", directory: "/repo" },
+				{
+					OPENCODE_BASE_URL: "http://127.0.0.1:57985/",
+					OPENCODE_DIRECTORY: "/repo",
+					OPENCODE_WECHAT_BRIDGE_RUNTIME_ID: "runtime-1",
+				},
+			),
+		).toBe(false);
+	});
+
+	it("rejects alive bridge metadata from a previous runtime fingerprint", () => {
+		const metadata = { baseUrl: "http://127.0.0.1:57985/", directory: "/repo", runtimeId: "runtime-1" };
+		const env = {
+			OPENCODE_BASE_URL: "http://127.0.0.1:57985/",
+			OPENCODE_DIRECTORY: "/repo",
+			OPENCODE_WECHAT_BRIDGE_RUNTIME_ID: "runtime-2",
+		};
+
+		expect(bridgeMetadataMatchesEnv(metadata, env)).toBe(false);
+	});
+
+	it("accepts an alive bridge launched with the current OpenCode base URL", () => {
+		const metadata = { baseUrl: "http://127.0.0.1:57985/", directory: "/repo", runtimeId: "runtime-1" };
+		const env = {
+			OPENCODE_BASE_URL: "http://127.0.0.1:57985/",
+			OPENCODE_DIRECTORY: "/repo",
+			OPENCODE_WECHAT_BRIDGE_RUNTIME_ID: "runtime-1",
+		};
+
+		expect(
+			bridgeMetadataMatchesEnv(metadata, env),
+		).toBe(true);
+	});
 });
