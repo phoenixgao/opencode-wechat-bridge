@@ -1,5 +1,7 @@
 # opencode-wechat-plugin
 
+English | [简体中文](README.zh-CN.md)
+
 Bridge a WeChat iLink bot to a plugin-managed OpenCode backend. Incoming WeChat DMs drive OpenCode sessions, agent replies go back to WeChat, and the agent gets a `wechat_notify` tool for proactive notifications.
 
 One npm package, two plugin entrypoints: a server plugin that registers the tool and starts the background bridge, and a TUI plugin that adds `/wechat-bind`, `/wechat-status`, and `/wechat-disconnect`.
