@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { tokenPath, targetPath, syncBufPath } from "./paths.js";
+import { bridgeMetaPath, bridgePidPath, syncBufPath, targetPath, tokenPath } from "./paths.js";
 
 export interface DisconnectResult {
   removed: string[];
@@ -9,6 +9,8 @@ const TARGETS: Array<{ name: string; resolve: () => string }> = [
   { name: "token.json", resolve: tokenPath },
   { name: "target.json", resolve: targetPath },
   { name: "sync-buf.json", resolve: syncBufPath },
+  { name: "bridge.pid", resolve: bridgePidPath },
+  { name: "bridge-meta.json", resolve: bridgeMetaPath },
 ];
 
 export function disconnectWechat(): DisconnectResult {
