@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 describe("non-blocking plugin startup", () => {
   it("returns tool registration immediately even when bridge startup is slow", async () => {
@@ -34,6 +37,22 @@ describe("non-blocking plugin startup", () => {
 
     const tool = result.tool ?? {};
     expect(tool.wechat_notify).toBeDefined();
+  });
+
+  it("throws when wechat_notify has no token bound", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "owc-sf-"));
+    process.env.OPENCODE_WECHAT_STATE_DIR = tmp;
+
+    const plugin = (await import("../src/index.js")).createWechatPlugin(async () => ({ spawned: true, pid: 42 }));
+
+    const result = await plugin({} as any);
+    const fn = result.tool?.wechat_notify?.execute;
+    if (!fn) throw new Error("missing wechat_notify tool");
+
+    await expect(fn({ text: "test" }, {} as any)).rejects.toThrow(/not bound|no token/i);
+
+    delete process.env.OPENCODE_WECHAT_STATE_DIR;
+    fs.rmSync(tmp, { recursive: true, force: true });
   });
 
   it("skips bridge startup when OPENCODE_WECHAT_IS_MANAGED_BACKEND is set", async () => {

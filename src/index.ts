@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { closeSync, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Plugin, type PluginInput, tool } from "@opencode-ai/plugin";
@@ -126,6 +126,10 @@ async function ensureOpenCodeBackendRunning(baseEnv?: NodeJS.ProcessEnv): Promis
 		env: { ...baseEnv, OPENCODE_WECHAT_IS_MANAGED_BACKEND: "1" },
 	});
 	child.unref();
+	try {
+		closeSync(logFd);
+	} catch {
+	}
 
 	const pid = child.pid ?? 0;
 	writePrivateFile(pidFile, String(pid));
@@ -212,6 +216,10 @@ async function ensureBridgeRunning(
 		env,
 	});
 	child.unref();
+	try {
+		closeSync(logFd);
+	} catch {
+	}
 	const pid = child.pid ?? 0;
 	writePrivateFile(pidFile, String(pid));
 	writePrivateFile(
@@ -257,11 +265,11 @@ export function createWechatPlugin(
 				async execute(args): Promise<string> {
 					const token = await loadToken(ensureStateDir());
 						if (!token) {
-							return "wechat_notify failed: no token bound. Run `opencode-wechat bind` first.";
+							throw new Error("wechat_notify failed: no token bound. Run `opencode-wechat bind` first.");
 						}
 						const target = await loadTarget();
 						if (!target) {
-							return "wechat_notify failed: no target user bound. Send a WeChat message to the bot first so the bridge captures your user_id.";
+							throw new Error("wechat_notify failed: no target user bound. Send a WeChat message to the bot first so the bridge captures your user_id.");
 						}
 						const chunks = splitText(args.text, 1800);
 						for (const chunk of chunks) {
