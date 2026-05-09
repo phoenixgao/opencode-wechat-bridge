@@ -103,6 +103,27 @@ export async function runPoll(opts: PollOptions = {}): Promise<number> {
 		},
 	});
 
-	log.info("poll: monitor exited, shutting down");
-	return 0;
+log.info("poll: monitor exited, shutting down");
+  return 0;
+}
+
+export async function retryPollLoop(
+  pollFn: () => Promise<number>,
+  opts: { delay?: number; signal?: AbortSignal } = {},
+): Promise<void> {
+  const delay = opts.delay ?? 2000;
+  while (!opts.signal?.aborted) {
+    try {
+      const code = await pollFn();
+      log.warn(`poll loop exited with code ${code}; restarting in ${delay}ms`);
+    } catch (err) {
+      log.error(`poll loop crashed`, { err: (err as Error).message });
+    }
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, delay);
+      if (opts.signal) {
+        opts.signal.addEventListener("abort", () => clearTimeout(t), { once: true });
+      }
+    });
+  }
 }

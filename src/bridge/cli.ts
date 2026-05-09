@@ -134,8 +134,9 @@ async function cmdBind(): Promise<number> {
 }
 
 async function cmdPoll(): Promise<number> {
-	const { runPoll } = await import("./poll.js");
-	return runPoll();
+  const { runPoll, retryPollLoop } = await import("./poll.js");
+  await retryPollLoop(runPoll);
+  return 0;
 }
 
 async function main(): Promise<void> {
