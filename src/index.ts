@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { closeSync, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,6 +52,34 @@ function readPidIfPresent(pidFile: string): number | null {
 	if (!existsSync(pidFile)) return null;
 	const existing = Number.parseInt(readFileSync(pidFile, "utf8").trim(), 10);
 	return Number.isFinite(existing) ? existing : null;
+}
+
+/**
+ * Enumerate ALL running bridge poller PIDs by scanning ps for our cli.js poll command.
+ * Each opencode plugin load can spawn a poller; if older instances orphan their pidfile,
+ * stale pollers accumulate and each independently long-polls WeChat -> duplicate dispatches.
+ */
+function findAllBridgePollerPids(cliPathToMatch: string): number[] {
+	try {
+		const out = execFileSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" });
+		const pids: number[] = [];
+		const myPid = process.pid;
+		for (const line of out.split("\n")) {
+			const trimmed = line.trim();
+			if (!trimmed) continue;
+			const m = trimmed.match(/^(\d+)\s+(.*)$/);
+			if (!m) continue;
+			const pid = Number(m[1]);
+			const cmd = m[2] ?? "";
+			if (pid === myPid) continue;
+			if (cmd.includes(cliPathToMatch) && /\bpoll\b/.test(cmd)) {
+				pids.push(pid);
+			}
+		}
+		return pids;
+	} catch {
+		return [];
+	}
 }
 
 type OpenCodeBackendEnv = {
@@ -200,15 +228,17 @@ async function ensureBridgeRunning(
 	const env = buildBridgeEnv(process.env, input, backendUrl);
 	env.OPENCODE_WECHAT_BRIDGE_RUNTIME_ID = bridgeRuntimeId();
 	const pidFile = bridgePidPath();
-	if (existsSync(pidFile)) {
-		const existing = readPidIfPresent(pidFile);
-		if (existing !== null && isAlive(existing)) {
-			if (bridgeMetadataMatchesEnv(readBridgeMetadata(), env)) {
-				return { spawned: false, pid: existing };
-			}
-			stopProcess(existing);
-		}
+	const recordedPid = existsSync(pidFile) ? readPidIfPresent(pidFile) : null;
+	if (
+		recordedPid !== null &&
+		isAlive(recordedPid) &&
+		bridgeMetadataMatchesEnv(readBridgeMetadata(), env)
+	) {
+		const stragglers = findAllBridgePollerPids(cliPath).filter((p) => p !== recordedPid);
+		for (const p of stragglers) stopProcess(p);
+		return { spawned: false, pid: recordedPid };
 	}
+	for (const p of findAllBridgePollerPids(cliPath)) stopProcess(p);
 	const logFd = openPrivateAppendFile(bridgeLogPath());
 	const child = spawn(resolveBridgeNodeExecutable(process.execPath, process.env), [cliPath, "poll"], {
 		detached: true,

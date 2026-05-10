@@ -52,13 +52,22 @@ function unwrap<T>(r: unknown): T {
 
 async function sendChunked(token: TokenData, target: Target, text: string): Promise<void> {
   const segs = splitText(text, 1800);
-  for (const seg of segs) {
-    await sendTextMessage(target.to_user_id, seg, {
-      baseUrl: token.baseUrl,
-      token: token.token,
-      contextToken: target.context_token,
-    });
+  log.info("sendChunked: start", { toUser: target.to_user_id, segs: segs.length, totalLen: text.length });
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i] ?? "";
+    try {
+      await sendTextMessage(target.to_user_id, seg, {
+        baseUrl: token.baseUrl,
+        token: token.token,
+        contextToken: target.context_token,
+      });
+      log.info("sendChunked: seg ok", { idx: i + 1, of: segs.length, len: seg.length });
+    } catch (err) {
+      log.warn("sendChunked: seg FAILED", { idx: i + 1, of: segs.length, err: (err as Error).message });
+      throw err;
+    }
   }
+  log.info("sendChunked: done", { toUser: target.to_user_id, segs: segs.length });
 }
 
 async function snapshotMessageIds(client: OpencodeClient, cfg: RouterConfig, sessionId: string): Promise<Set<string>> {
@@ -79,38 +88,60 @@ async function watchAndPushAssistantReply(
   token: TokenData,
   beforeMsgIds: Set<string>,
 ): Promise<void> {
+  log.info("watchAndPushAssistantReply: started", { sessionId, dir: cfg.directory, beforeCount: beforeMsgIds.size });
   const deadline = Date.now() + 5 * 60_000;
+  let iteration = 0;
   while (Date.now() < deadline) {
     await sleep(2000);
+    iteration++;
     try {
       const r = await client.session.messages({
         path: { id: sessionId },
         query: { directory: cfg.directory, limit: 20 },
       });
-      const arr = unwrap<Array<{ info?: { id?: string; role?: string; time?: { completed?: number } }; parts?: Array<{ type?: string; text?: string }> }>>(r) || [];
+      const arr = unwrap<Array<{ id?: string; info?: { id?: string; role?: string; time?: { completed?: number } }; role?: string; time?: { created?: number; completed?: number }; parts?: Array<{ type?: string; text?: string }> }>>(r) || [];
+      const summary = arr.map((m) => {
+        const role = m.info?.role || m.role || "?";
+        const id = (m.info?.id || m.id || "?").slice(0, 12);
+        const done = !!(m.info?.time?.completed || m.time?.completed);
+        const seen = beforeMsgIds.has(m.info?.id || m.id || "");
+        return `${role[0]}:${id}${done ? "✓" : "·"}${seen ? "S" : ""}`;
+      }).join(" ");
+      if (iteration === 1 || iteration % 10 === 0) {
+        log.info("watcher iter", { sessionId, iter: iteration, n: arr.length, msgs: summary });
+      }
       for (const m of arr) {
-        if (
-          m.info?.role === "assistant" &&
-          m.info.time?.completed &&
-          m.info.id &&
-          !beforeMsgIds.has(m.info.id)
-        ) {
-			const text = (m.parts || [])
-				.filter((p) => p.type === "text" && typeof p.text === "string")
-				.map((p) => p.text)
-				.filter((p): p is string => typeof p === "string")
-				.join("\n")
-				.trim();
-          if (!text) return;
-          const tgt = loadTarget();
-          if (!tgt) {
-            log.warn("watchAndPushAssistantReply: no target.json");
-            return;
+        const msgRole = m.info?.role || m.role || "";
+        const msgId = m.info?.id || m.id || "";
+        const completed = m.info?.time?.completed || m.time?.completed;
+        if (msgRole !== "assistant" || !msgId || beforeMsgIds.has(msgId)) continue;
+        if (!completed) {
+          if (iteration === 1) {
+            log.info("watcher: new assistant msg, not yet completed", { sessionId, msgId });
           }
-          await sendChunked(token, tgt, text);
-          log.info("pushed assistant reply", { sessionId, len: text.length });
+          continue;
+        }
+        log.info("watcher: new completed assistant msg", { sessionId, msgId });
+        const text = (m.parts || [])
+          .filter((p) => p.type === "text" && typeof p.text === "string")
+          .map((p) => p.text)
+          .filter((p): p is string => typeof p === "string")
+          .join("\n")
+          .trim();
+        if (!text) {
+          log.info("watcher: assistant msg has no text part, marking seen", { sessionId, msgId, partTypes: (m.parts || []).map((p) => p.type) });
+          beforeMsgIds.add(msgId);
+          continue;
+        }
+        beforeMsgIds.add(msgId);
+        const tgt = loadTarget();
+        if (!tgt) {
+          log.warn("watchAndPushAssistantReply: no target.json");
           return;
         }
+        await sendChunked(token, tgt, text);
+        log.info("pushed assistant reply", { sessionId, len: text.length });
+        return;
       }
     } catch (err) {
       log.warn("watchAndPushAssistantReply poll error", { err: (err as Error).message, sessionId });
